@@ -1,5 +1,7 @@
 # Arboré
 
+![Arboré](social/social.png)
+
 `git worktree` の糖衣コマンドです。worktree を作るときに、`.worktreeinclude` のファイルのコピーと、Docker Compose がぶつからないための override の生成を自動で行います。
 
 ## 必要なもの
