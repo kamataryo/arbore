@@ -80,7 +80,7 @@ gen_override() {
           + (if any(.ports[]?; .published) then {ports: [.ports[] | if .published then .published |= shift else . end]} else {} end)
         ) | with_entries(select(.value != {}))) }'
   } | sed 's/^\( *"ports": \)\[/\1!override [/' > "$dir/$OVERRIDE"
-  echo "override : $dir/$OVERRIDE（プロジェクト名 $project、ポート +$((index * 1000))）"
+  echo "override : $dir/${OVERRIDE}（プロジェクト名 ${project}、ポート +$((index * 1000))）"
 }
 
 cmd_create() {
