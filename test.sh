@@ -66,6 +66,9 @@ git -C "$wt" checkout -q docker-compose.yaml
 check "消える" '"$arbore" remove feature/x >/dev/null && [ ! -e "$wt" ]'
 check "compose down を呼ぶ" '[ -f "$tmp/down.log" ]'
 check "ブランチは残る" 'git rev-parse -q --verify refs/heads/feature/x >/dev/null'
+check "外から消すと案内は出ない" '! "$arbore" remove y 2>&1 >/dev/null | grep -q "cd "'
+"$arbore" create w >/dev/null 2>&1
+check "中から消すと本体への cd を案内する" '(cd "$tmp/proj.w/" && "$arbore" remove w 2>&1 >/dev/null) | grep -qF "cd $tmp/proj "'
 "$arbore" create z >/dev/null 2>&1
 check "空いた番号を再利用する" 'grep -q "index: 1" "$tmp/proj.z/docker-compose.override.yaml"'
 

@@ -101,6 +101,7 @@ cmd_remove() {
   name="${1:?usage: arboré remove <name>}"
   dir="$(wt_dir "$name")"
   [ -d "$dir" ] || die "worktree が見つかりません: $dir"
+  here="$(pwd -P)" main="$(main_root)"
   # コンテナを消してから git に断られると中途半端に残るので、未コミットの変更は先に見る
   # （安全弁。承知なら git worktree remove --force で直接消す）
   dirty="$(git -C "$dir" status --porcelain | grep -vx "?? $OVERRIDE" || true)"
@@ -115,6 +116,8 @@ $dirty"
   git worktree remove "$dir"
   echo "削除しました: $dir"
   echo "ブランチ $name は残しています"
+  # 呼び出し元のシェルは消えたディレクトリに残るので、戻り先を案内する（子プロセスからは cd できない）
+  case "$here/" in "$dir"/*) echo "arboré: カレントディレクトリが消えました。cd $main で本体に戻れます" >&2 ;; esac
 }
 
 # cd "$(arboré dir <name>)" 用。無いときに空を返すと cd がホームへ飛ぶので止める
