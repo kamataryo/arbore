@@ -117,6 +117,13 @@ $dirty"
   echo "ブランチ $name は残しています"
 }
 
+# cd "$(arboré dir <name>)" 用。無いときに空を返すと cd がホームへ飛ぶので止める
+cmd_dir() {
+  dir="$(wt_dir "${1:?usage: arboré dir <name>}")"
+  [ -d "$dir" ] || die "worktree が見つかりません: $dir"
+  echo "$dir"
+}
+
 # arboré で作った worktree の名前（ディレクトリ名の接尾辞）を並べる。補完でも使う
 cmd_list() {
   m="$(main_root)"
@@ -131,6 +138,7 @@ arboré — git worktree の糖衣コマンド
   arboré create <name>   現在の HEAD からブランチ <name> と worktree ../<repo>.<name> を作る
                          .worktreeinclude のファイルをコピーし、compose があれば override を置く
   arboré remove <name>   コンテナ・ボリュームごと worktree を消す（ブランチは残す）
+  arboré dir <name>      worktree のパスを出力（cd "$(arboré dir <name>)"）
   arboré list            arboré で作った worktree の名前を一覧
   arboré help            このヘルプ
   arboré completion      補完スクリプトを出力（eval "$(arboré completion)"）
@@ -142,8 +150,8 @@ cmd_completion() {
 if [ -n "${ZSH_VERSION:-}" ]; then
   _arbore() {
     if (( CURRENT == 2 )); then
-      compadd create remove list help completion
-    elif (( CURRENT == 3 )) && [[ $words[2] == remove ]]; then
+      compadd create remove dir list help completion
+    elif (( CURRENT == 3 )) && [[ $words[2] == remove || $words[2] == dir ]]; then
       compadd -- ${(f)"$(arboré list 2>/dev/null)"}
     fi
   }
@@ -151,8 +159,8 @@ if [ -n "${ZSH_VERSION:-}" ]; then
 else
   _arbore() {
     case "$COMP_CWORD" in
-      1) COMPREPLY=($(compgen -W "create remove list help completion" -- "${COMP_WORDS[1]}")) ;;
-      2) [ "${COMP_WORDS[1]}" = remove ] && COMPREPLY=($(compgen -W "$(arboré list 2>/dev/null)" -- "${COMP_WORDS[2]}")) ;;
+      1) COMPREPLY=($(compgen -W "create remove dir list help completion" -- "${COMP_WORDS[1]}")) ;;
+      2) case "${COMP_WORDS[1]}" in remove|dir) COMPREPLY=($(compgen -W "$(arboré list 2>/dev/null)" -- "${COMP_WORDS[2]}")) ;; esac ;;
     esac
     return 0
   }
@@ -164,6 +172,7 @@ EOF
 case "${1:-}" in
   create)      shift; cmd_create "$@" ;;
   remove)      shift; cmd_remove "$@" ;;
+  dir)         shift; cmd_dir "$@" ;;
   list)        cmd_list ;;
   completion)  cmd_completion ;;
   help|'')     cmd_help ;;

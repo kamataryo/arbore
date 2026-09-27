@@ -33,6 +33,7 @@ arboré remove feature/login   # 片付ける（ブランチは残る）
 |---|---|
 | `arboré create <name>` | 現在の HEAD からブランチ `<name>` を作り、`../<repo>.<name>` に worktree を置きます。`/` はディレクトリ名では `-` になります |
 | `arboré remove <name>` | コンテナとボリュームを `docker compose down --volumes` で消してから、worktree を削除します。ブランチは残します |
+| `arboré dir <name>` | worktree のパスを出力します。`cd "$(arboré dir <name>)"` で移動できます |
 | `arboré list` | arboré で作った worktree の名前を一覧します |
 | `arboré help` | ヘルプを表示します |
 | `arboré completion` | 補完スクリプトを出力します |

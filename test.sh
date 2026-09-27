@@ -53,6 +53,8 @@ check "ポートは +1000" 'grep -q "\"9080\"" "$ov" && grep -q "\"19080-19081\"
 check "元のポートは残らない" '! grep -q "\"8080\"" "$ov"'
 check "ports の無いサービスは書かない" '! grep -q worker "$ov"'
 check "list に出る" '[ "$("$arbore" list)" = feature-x ]'
+check "dir でパスを返す" '[ "$("$arbore" dir feature/x)" = "$wt" ]'
+check "dir は無ければ失敗" '! "$arbore" dir nothing >/dev/null 2>&1'
 
 "$arbore" create y >/dev/null 2>&1
 check "2 つ目は +2000" 'grep -q "\"10080\"" "$tmp/proj.y/docker-compose.override.yaml"'
