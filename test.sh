@@ -59,6 +59,13 @@ check "dir は無ければ失敗" '! "$arbore" dir nothing >/dev/null 2>&1'
 "$arbore" create y >/dev/null 2>&1
 check "2 つ目は +2000" 'grep -q "\"10080\"" "$tmp/proj.y/docker-compose.override.yaml"'
 
+mv .worktreeinclude .wi
+echo n | "$arbore" create no-inc >/dev/null 2>&1
+check ".worktreeinclude が無く n ならコピーしない" '[ ! -e "$tmp/proj.no-inc/.env" ]'
+"$arbore" create all-inc </dev/null >/dev/null 2>&1
+check ".worktreeinclude が無く既定なら gitignore 全件をコピー" '[ -f "$tmp/proj.all-inc/.env" ] && [ ! -e "$tmp/proj.all-inc/README" ]'
+mv .wi .worktreeinclude
+
 echo "remove"
 echo x >> "$wt/docker-compose.yaml"
 check "未コミットの変更があれば止まる" '! "$arbore" remove feature/x >/dev/null 2>&1 && [ -d "$wt" ] && [ ! -e "$tmp/down.log" ]'

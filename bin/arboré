@@ -30,17 +30,25 @@ next_index() {
   echo "$i"
 }
 
-# .worktreeinclude のパターンに一致し、かつ gitignore されているファイルを本体からコピーする
+# .worktreeinclude のパターンに一致し、かつ gitignore されているファイルを本体からコピーする。
+# .worktreeinclude が無ければ、gitignore されたファイルをすべてコピーするか尋ねる（既定は Y）
 copy_includes() {
   main="$1" dir="$2"
-  [ -f "$main/.worktreeinclude" ] || return 0
+  if [ -f "$main/.worktreeinclude" ]; then
+    pat=--exclude-from=.worktreeinclude label=.worktreeinclude
+  else
+    printf 'arboré: .worktreeinclude がありません。gitignore されたファイルをすべてコピーしますか？ [Y/n] ' >&2
+    read -r ans || ans=
+    case "$ans" in [nN]*) return 0 ;; esac
+    pat='--exclude=*' label='gitignore 全件'
+  fi
   list="$(mktemp)"
   git -C "$main" ls-files --others --ignored --exclude-standard | sort > "$list.ignored"
-  git -C "$main" ls-files --others --ignored --exclude-from=.worktreeinclude | sort \
+  git -C "$main" ls-files --others --ignored "$pat" | sort \
     | comm -12 - "$list.ignored" > "$list"
   if [ -s "$list" ]; then
     tar -C "$main" -cf - -T "$list" | tar -C "$dir" -xf -
-    echo "コピー   : $(wc -l < "$list" | tr -d ' ') ファイル（.worktreeinclude）"
+    echo "コピー   : $(wc -l < "$list" | tr -d ' ') ファイル（${label}）"
   fi
   rm -f "$list" "$list.ignored"
 }

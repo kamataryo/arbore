@@ -51,6 +51,8 @@ worktree の中から実行しても、本体のリポジトリを基準に動�
 
 `node_modules` なども書けばコピーされますが、大きいと時間がかかります。
 
+`.worktreeinclude` が無いときは `[Y/n]` で確認し、Y（既定）なら gitignore されたファイルをすべてコピーします。
+
 ### Docker Compose の override
 
 compose ファイル（`compose.yaml` / `docker-compose.yaml` など）があると、`docker compose config` で正規化した構成から `docker-compose.override.yaml` を生成します。Compose が自動で読む名前なので、worktree の中では `docker compose up` するだけで効きます。
