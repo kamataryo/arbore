@@ -55,6 +55,7 @@ check "ports の無いサービスは書かない" '! grep -q worker "$ov"'
 check "list に出る" '[ "$("$arbore" list)" = feature-x ]'
 check "dir でパスを返す" '[ "$("$arbore" dir feature/x)" = "$wt" ]'
 check "dir は無ければ失敗" '! "$arbore" dir nothing >/dev/null 2>&1'
+check "dir は引数なしで本体を返す" '[ "$(cd "$wt" && "$arbore" dir)" = "$tmp/proj" ]'
 
 "$arbore" create y >/dev/null 2>&1
 check "2 つ目は +2000" 'grep -q "\"10080\"" "$tmp/proj.y/docker-compose.override.yaml"'

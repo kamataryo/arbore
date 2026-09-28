@@ -136,8 +136,10 @@ $dirty"
 }
 
 # cd "$(arboré dir <name>)" 用。無いときに空を返すと cd がホームへ飛ぶので止める
+# 引数なしなら本体のパス
 cmd_dir() {
-  dir="$(wt_dir "${1:?usage: arboré dir <name>}")"
+  [ $# -eq 0 ] && { main_root; return; }
+  dir="$(wt_dir "$1")"
   [ -d "$dir" ] || die "worktree が見つかりません: $dir"
   echo "$dir"
 }
@@ -159,7 +161,7 @@ arboré — git worktree の糖衣コマンド
   arboré create <name>   worktree ../<repo>.<name> を作る。ブランチ <name> が無ければ現在の HEAD から作る
                          .worktreeinclude のファイルをコピーし、compose があれば override を置く
   arboré remove <name>   コンテナ・ボリュームごと worktree を消す（ブランチは残す）
-  arboré dir <name>      worktree のパスを出力（cd "$(arboré dir <name>)"）
+  arboré dir [name]      worktree のパスを出力（cd "$(arboré dir <name>)"）。省略すると本体のパス
   arboré list            arboré で作った worktree の名前を一覧
   arboré help            このヘルプ
   arboré completion      補完スクリプトを出力（eval "$(arboré completion)"）
