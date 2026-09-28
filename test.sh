@@ -78,6 +78,9 @@ check "外から消すと案内は出ない" '! "$arbore" remove y 2>&1 >/dev/nu
 check "中から消すと本体への cd を案内する" '(cd "$tmp/proj.w/" && "$arbore" remove w 2>&1 >/dev/null) | grep -qF "cd $tmp/proj "'
 "$arbore" create z >/dev/null 2>&1
 check "空いた番号を再利用する" 'grep -q "index: 1" "$tmp/proj.z/docker-compose.override.yaml"'
+check "残したブランチでもう一度 create できる" '"$arbore" create feature/x >/dev/null 2>&1 && [ "$(git -C "$wt" branch --show-current)" = feature/x ]'
+git worktree add -q .claude/worktrees/cc -b cc
+check "list は本体の下の worktree を拾わない" '! "$arbore" list | grep -q claude'
 
 echo "補完スクリプトが両シェルで読める"
 check "bash" 'bash -c "eval \"\$($arbore completion)\" && complete -p arboré >/dev/null"'

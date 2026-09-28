@@ -97,7 +97,12 @@ cmd_create() {
   main="$(main_root)"
   dir="$(wt_dir "$name")"
   index="$(next_index)"
-  git worktree add -b "$name" "$dir"
+  # 既存のブランチ（remove で残したものを含む）はそのまま使う
+  if git show-ref --verify --quiet "refs/heads/$name"; then
+    git worktree add "$dir" "$name"
+  else
+    git worktree add -b "$name" "$dir"
+  fi
   echo "$index" > "$(git -C "$dir" rev-parse --absolute-git-dir)/arbore-index"
   copy_includes "$main" "$dir"
   gen_override "$dir" "$index"
@@ -139,14 +144,17 @@ cmd_dir() {
 cmd_list() {
   m="$(main_root)"
   prefix="$(dirname "$m")/$(basename "$m")."
-  git worktree list --porcelain | sed -n "s|^worktree $prefix||p"
+  # prefix は正規表現ではなく文字列として比べる（. が / にマッチして repo/.claude/... まで拾わないように）
+  git worktree list --porcelain | while IFS= read -r l; do
+    case "$l" in "worktree $prefix"*) echo "${l#"worktree $prefix"}" ;; esac
+  done
 }
 
 cmd_help() {
   cat <<'EOF'
 arboré — git worktree の糖衣コマンド
 
-  arboré create <name>   現在の HEAD からブランチ <name> と worktree ../<repo>.<name> を作る
+  arboré create <name>   worktree ../<repo>.<name> を作る。ブランチ <name> が無ければ現在の HEAD から作る
                          .worktreeinclude のファイルをコピーし、compose があれば override を置く
   arboré remove <name>   コンテナ・ボリュームごと worktree を消す（ブランチは残す）
   arboré dir <name>      worktree のパスを出力（cd "$(arboré dir <name>)"）
