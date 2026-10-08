@@ -85,6 +85,23 @@ check "detached HEAD ならブランチの案内は出さない" '! "$arbore" re
 git worktree add -q .claude/worktrees/cc -b cc
 check "list は本体の下の worktree を拾わない" '! "$arbore" list | grep -q claude'
 
+echo "prune"
+ci() { echo "$2" > "$tmp/proj.$1/$2" && git -C "$tmp/proj.$1" add "$2" && git -C "$tmp/proj.$1" commit -qm "$2"; }
+"$arbore" create p-merged >/dev/null 2>&1 && ci p-merged a && git merge -q --ff-only p-merged
+"$arbore" create p-squash >/dev/null 2>&1 && ci p-squash b && ci p-squash c
+git merge -q --squash p-squash >/dev/null && git commit -qm squash
+"$arbore" create p-rebase >/dev/null 2>&1 && ci p-rebase d && ci p-rebase e
+echo f > f && git add f && git commit -qm f && git cherry-pick ..p-rebase >/dev/null
+"$arbore" create p-open >/dev/null 2>&1 && ci p-open g
+"$arbore" create p-fresh >/dev/null 2>&1
+out="$("$arbore" prune </dev/null 2>/dev/null)"
+check "ff / squash / rebase で取り込まれたものを拾う" 'echo "$out" | grep -qx "  p-merged" && echo "$out" | grep -qx "  p-squash" && echo "$out" | grep -qx "  p-rebase"'
+check "未マージ・作りたて・既存の worktree は拾わない" '! echo "$out" | grep -qE "p-open|p-fresh|feature-x|  z$"'
+check "確認で既定なら消さない" '[ -d "$tmp/proj.p-merged" ]'
+echo y | "$arbore" prune --branch >/dev/null 2>&1
+check "y で消える" '[ ! -e "$tmp/proj.p-merged" ] && [ ! -e "$tmp/proj.p-squash" ] && [ ! -e "$tmp/proj.p-rebase" ] && [ -d "$tmp/proj.p-open" ] && [ -d "$tmp/proj.p-fresh" ]'
+check "--branch でブランチも消える" '! git rev-parse -q --verify refs/heads/p-squash >/dev/null && git rev-parse -q --verify refs/heads/p-open >/dev/null'
+
 echo "補完スクリプトが両シェルで読める"
 check "bash" 'bash -c "eval \"\$($arbore completion)\" && complete -p arboré >/dev/null"'
 if command -v zsh >/dev/null; then

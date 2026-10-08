@@ -130,9 +130,52 @@ $dirty"
   fi
   git worktree remove "$dir"
   echo "削除しました: $dir"
-  [ -z "$branch" ] || echo "ブランチ $branch は残しています"
+  if [ -n "$branch" ] && [ -n "${drop_branch:-}" ]; then
+    # prune で取り込み済みと判定したものだけ。squash merge だと -d は通らないので -D
+    git -C "$main" branch -qD "$branch" && echo "ブランチ $branch を削除しました"
+  elif [ -n "$branch" ]; then
+    echo "ブランチ $branch は残しています"
+  fi
   # 呼び出し元のシェルは消えたディレクトリに残るので、戻り先を案内する（子プロセスからは cd できない）
   case "$here/" in "$dir"/*) echo "arboré: カレントディレクトリが消えました。cd $main で本体に戻れます" >&2 ;; esac
+}
+
+# 取り込み先。ローカルの main は古いことがあるので origin/HEAD を優先し、無ければ本体のブランチ
+base_ref() {
+  git symbolic-ref -q --short refs/remotes/origin/HEAD \
+    || git -C "$(main_root)" branch --show-current | grep . \
+    || die "取り込み先のブランチが分かりません"
+}
+
+# ブランチ $1 が $2 に取り込まれているか
+# - 祖先なら取り込み済み。ただし作ってから一度もコミットしていない（先端が reflog の最初と同じ）ものは除く
+# - rebase merge: 全コミットと同じ変更が $2 にある
+# - squash merge: 差分を merge-base の上に 1 コミットとしてまとめ、同じ変更が $2 にある
+merged() {
+  if git merge-base --is-ancestor "$1" "$2"; then
+    [ "$(git rev-parse "$1")" != "$(git reflog show --format=%H "refs/heads/$1" | tail -n1)" ]
+  else
+    git cherry "$2" "$1" | grep -q '^+' || return 0
+    c="$(git commit-tree "$1^{tree}" -p "$(git merge-base "$2" "$1")" -m squash)"
+    ! git cherry "$2" "$c" | grep -q '^+'
+  fi
+}
+
+cmd_prune() {
+  case "${1:-}" in --branch) drop_branch=1 ;; '') drop_branch= ;; *) die "usage: arboré prune [--branch]" ;; esac
+  base="$(base_ref)"
+  targets="$(cmd_list | while IFS= read -r n; do
+    b="$(git -C "$(wt_dir "$n")" branch --show-current)"
+    if [ -n "$b" ] && [ "$b" != "${base#origin/}" ] && merged "$b" "$base"; then echo "$n"; fi
+  done)"
+  [ -n "$targets" ] || { echo "$base に取り込まれた worktree はありません"; return 0; }
+  echo "$base に取り込まれた worktree:"
+  echo "$targets" | sed 's/^/  /'
+  printf 'arboré: 削除しますか？%s [y/N] ' "${drop_branch:+（ブランチも消します）}" >&2
+  read -r ans || ans=
+  case "$ans" in [yY]*) ;; *) return 0 ;; esac
+  # 未コミットの変更などで 1 つ止まっても残りは続ける
+  for n in $targets; do (cmd_remove "$n") || echo "arboré: $n はスキップしました" >&2; done
 }
 
 # cd "$(arboré dir <name>)" 用。無いときに空を返すと cd がホームへ飛ぶので止める
@@ -161,6 +204,8 @@ arboré — git worktree の糖衣コマンド
   arboré create <name>   worktree ../<repo>.<name> を作る。ブランチ <name> が無ければ現在の HEAD から作る
                          .worktreeinclude のファイルをコピーし、compose があれば override を置く
   arboré remove <name>   コンテナ・ボリュームごと worktree を消す（ブランチは残す）
+  arboré prune [--branch]
+                         main に取り込まれた worktree を確認のうえ remove する。--branch でブランチも消す
   arboré dir [name]      worktree のパスを出力（cd "$(arboré dir <name>)"）。省略すると本体のパス
   arboré list            arboré で作った worktree の名前を一覧
   arboré help            このヘルプ
@@ -173,7 +218,7 @@ cmd_completion() {
 if [ -n "${ZSH_VERSION:-}" ]; then
   _arbore() {
     if (( CURRENT == 2 )); then
-      compadd create remove dir list help completion
+      compadd create remove prune dir list help completion
     elif (( CURRENT == 3 )) && [[ $words[2] == remove || $words[2] == dir ]]; then
       compadd -- ${(f)"$(arboré list 2>/dev/null)"}
     fi
@@ -182,7 +227,7 @@ if [ -n "${ZSH_VERSION:-}" ]; then
 else
   _arbore() {
     case "$COMP_CWORD" in
-      1) COMPREPLY=($(compgen -W "create remove dir list help completion" -- "${COMP_WORDS[1]}")) ;;
+      1) COMPREPLY=($(compgen -W "create remove prune dir list help completion" -- "${COMP_WORDS[1]}")) ;;
       2) case "${COMP_WORDS[1]}" in remove|dir) COMPREPLY=($(compgen -W "$(arboré list 2>/dev/null)" -- "${COMP_WORDS[2]}")) ;; esac ;;
     esac
     return 0
@@ -195,6 +240,7 @@ EOF
 case "${1:-}" in
   create)      shift; cmd_create "$@" ;;
   remove)      shift; cmd_remove "$@" ;;
+  prune)       shift; cmd_prune "$@" ;;
   dir)         shift; cmd_dir "$@" ;;
   list)        cmd_list ;;
   completion)  cmd_completion ;;
