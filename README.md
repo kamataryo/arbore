@@ -34,8 +34,8 @@ arboré remove feature/login   # 片付ける（ブランチは残る）
 | コマンド | 動作 |
 |---|---|
 | `arboré create <name>` | `../<repo>.<name>` に worktree を置きます。ブランチ `<name>` があればそれを使い、無ければ現在の HEAD から作ります。`/` はディレクトリ名では `-` になります |
-| `arboré remove <name>` | コンテナとボリュームを `docker compose down --volumes` で消してから、worktree を削除します。ブランチは残します |
-| `arboré prune [--branch]` | 取り込み先（`origin/HEAD`、無ければ本体のブランチ）に取り込まれた worktree を一覧し、確認のうえ `remove` します。merge / squash merge / rebase merge のどれでも検出しますが、作ってから一度もコミットしていないものは対象外です。`--branch` を付けるとブランチも消します。未コミットの変更がある worktree はスキップします |
+| `arboré remove <name>` | その worktree で起動したコンテナとボリュームを `docker compose down --volumes` で消してから、worktree を削除します。対象は Compose の `working_dir` ラベルで選ぶので、override が無くても片付きます。本体など別のディレクトリと同じプロジェクト名のものは残します。ブランチは残します |
+| `arboré prune [--branch]` | 取り込み先（`origin/HEAD`、無ければ本体のブランチ）に取り込まれた worktree を一覧し、確認のうえ `remove` します。merge / squash merge / rebase merge のどれでも検出しますが、作ってから一度もコミットしていないものは対象外です。`--branch` を付けるとブランチも消します。未コミットの変更がある worktree はスキップします。`git worktree remove` などで worktree だけ消えて残ったコンテナも一緒に一覧し、片付けます |
 | `arboré dir [name]` | worktree のパスを出力します。`cd "$(arboré dir <name>)"` で移動できます。`<name>` を省略すると本体のパスを出力します |
 | `arboré list` | arboré で作った worktree の名前を一覧します |
 | `arboré help` | ヘルプを表示します |

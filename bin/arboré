@@ -110,6 +110,33 @@ cmd_create() {
   echo "branch   : $name"
 }
 
+# ディレクトリ $1 で起動された compose プロジェクトを片付ける。
+# プロジェクト名ではなく Compose が付ける working_dir ラベルで選ぶので、override の有無や名前の衝突に左右されない
+down_dir() {
+  command -v docker >/dev/null || return 0
+  docker ps -a --filter "label=com.docker.compose.project.working_dir=$1" \
+    --format '{{.Label "com.docker.compose.project"}}' | sort -u | while IFS= read -r p; do
+    # 本体など別のディレクトリと同じプロジェクト名なら、down すると巻き添えになるので触らない
+    other="$(docker ps -a --filter "label=com.docker.compose.project=$p" \
+      --format '{{.Label "com.docker.compose.project.working_dir"}}' | grep -vxF "$1" || true)"
+    if [ -n "$other" ]; then
+      echo "arboré: プロジェクト $p は $1 以外でも使われているので、コンテナを残しました" >&2
+      continue
+    fi
+    # compose ファイルを読ませず、ラベルだけで対象を選ばせる（-p でもカレントの compose は読まれる）
+    (cd / && docker compose -p "$p" down --remove-orphans --volumes)
+  done
+}
+
+# arboré の worktree の位置（<repo>.*）で起動され、そのディレクトリがもう無いもの
+orphan_dirs() {
+  command -v docker >/dev/null || return 0
+  prefix="$(main_root)."
+  docker ps -a --format '{{.Label "com.docker.compose.project.working_dir"}}' | sort -u | while IFS= read -r d; do
+    case "$d" in "$prefix"*) [ -d "$d" ] || echo "$d" ;; esac
+  done
+}
+
 cmd_remove() {
   name="${1:?usage: arboré remove <name>}"
   dir="$(wt_dir "$name")"
@@ -122,12 +149,8 @@ cmd_remove() {
   dirty="$(git -C "$dir" status --porcelain | grep -vx "?? $OVERRIDE" || true)"
   [ -z "$dirty" ] || die "未コミットの変更があります: $dir
 $dirty"
-  if head -n1 "$dir/$OVERRIDE" 2>/dev/null | grep -q "^$MARK"; then
-    if command -v docker >/dev/null; then
-      (cd "$dir" && docker compose down --remove-orphans --volumes)
-    fi
-    rm "$dir/$OVERRIDE"
-  fi
+  down_dir "$dir"
+  if head -n1 "$dir/$OVERRIDE" 2>/dev/null | grep -q "^$MARK"; then rm "$dir/$OVERRIDE"; fi
   git worktree remove "$dir"
   echo "削除しました: $dir"
   if [ -n "$branch" ] && [ -n "${drop_branch:-}" ]; then
@@ -168,14 +191,24 @@ cmd_prune() {
     b="$(git -C "$(wt_dir "$n")" branch --show-current)"
     if [ -n "$b" ] && [ "$b" != "${base#origin/}" ] && merged "$b" "$base"; then echo "$n"; fi
   done)"
-  [ -n "$targets" ] || { echo "$base に取り込まれた worktree はありません"; return 0; }
-  echo "$base に取り込まれた worktree:"
-  echo "$targets" | sed 's/^/  /'
+  orphans="$(orphan_dirs)"
+  [ -n "$targets$orphans" ] || { echo "$base に取り込まれた worktree はありません"; return 0; }
+  if [ -n "$targets" ]; then
+    echo "$base に取り込まれた worktree:"
+    echo "$targets" | sed 's/^/  /'
+  fi
+  if [ -n "$orphans" ]; then
+    echo "worktree が消えて残ったコンテナ（起動したディレクトリ）:"
+    echo "$orphans" | sed 's/^/  /'
+  fi
   printf 'arboré: 削除しますか？%s [y/N] ' "${drop_branch:+（ブランチも消します）}" >&2
   read -r ans || ans=
   case "$ans" in [yY]*) ;; *) return 0 ;; esac
   # 未コミットの変更などで 1 つ止まっても残りは続ける
   for n in $targets; do (cmd_remove "$n") || echo "arboré: $n はスキップしました" >&2; done
+  [ -z "$orphans" ] || echo "$orphans" | while IFS= read -r d; do
+    down_dir "$d" || echo "arboré: $d のコンテナはスキップしました" >&2
+  done
 }
 
 # cd "$(arboré dir <name>)" 用。無いときに空を返すと cd がホームへ飛ぶので止める
@@ -206,6 +239,7 @@ arboré — git worktree の糖衣コマンド
   arboré remove <name>   コンテナ・ボリュームごと worktree を消す（ブランチは残す）
   arboré prune [--branch]
                          main に取り込まれた worktree を確認のうえ remove する。--branch でブランチも消す
+                         worktree が消えて残ったコンテナも片付ける
   arboré dir [name]      worktree のパスを出力（cd "$(arboré dir <name>)"）。省略すると本体のパス
   arboré list            arboré で作った worktree の名前を一覧
   arboré help            このヘルプ
